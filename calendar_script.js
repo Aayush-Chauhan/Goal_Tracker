@@ -1,86 +1,134 @@
-let mindMapData = {
-  "meta": {
-    "name": "mindmap",
-    "author": "user",
-    "version": "0.1"
-  },
-  "format": "node_tree",
-  "data": {
-    "id": "root",
-    "topic": "Start Here", // Default root node topic
-    "children": [] // No children initially
-  }
-};
+let nav = 0;
+let clicked = null;
+let events = localStorage.getItem('events') ? JSON.parse(localStorage.getItem('events')) : [];
 
-let jm;
-let nodeCounter = 1; // Counter for generating unique node IDs
+const calendar = document.getElementById('calendar');
+const newEventModal = document.getElementById('newEventModal');
+const deleteEventModal = document.getElementById('deleteEventModal');
+const backDrop = document.getElementById('modalBackDrop');
+const eventTitleInput = document.getElementById('eventTitleInput');
+const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-// Start Mind Map
-document.getElementById("startMindMap").addEventListener("click", function () {
-  document.getElementById("mindMapContainer").style.display = "block";
-  if (!jm) {
-    jm = new jsMind({
-      container: 'mindMapCanvas',
-      theme: 'primary',
-      editable: true
-    });
-    jm.show(mindMapData); // Initialize the mind map
-  }
-});
+function openModal(date) {
+  clicked = date;
 
-// Add Node
-document.getElementById("addNode").addEventListener("click", function () {
-  const selectedNode = jm.get_selected_node();
-  if (!selectedNode) {
-    alert("Please select a node to add a child node.");
-    return;
+  const eventForDay = events.find(e => e.date === clicked);
+
+  if (eventForDay) {
+    document.getElementById('eventText').innerText = eventForDay.title;
+    deleteEventModal.style.display = 'block';
+  } else {
+    newEventModal.style.display = 'block';
   }
 
-  const newNodeId = `node${nodeCounter++}`;
-  const newNodeTopic = `Node ${nodeCounter - 1}`;
+  backDrop.style.display = 'block';
+}
+
+function load() {
+  const dt = new Date();
+
+  if (nav !== 0) {
+    dt.setMonth(new Date().getMonth() + nav);
+  }
+
+  const day = dt.getDate();
+  const month = dt.getMonth();
+  const year = dt.getFullYear();
+
+  const firstDayOfMonth = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
   
-  // Create the new node object
-  const newNode = {
-    id: newNodeId,
-    topic: newNodeTopic,
-    children: [] // New node doesn't have children initially
-  };
+  const dateString = firstDayOfMonth.toLocaleDateString('en-us', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  });
+  const paddingDays = weekdays.indexOf(dateString.split(', ')[0]);
 
-  jm.add_node(selectedNode, newNode); // Add the new child node to the selected node
-  jm.refresh(); // Refresh the mind map layout after adding a node
-});
+  document.getElementById('monthDisplay').innerText = 
+    `${dt.toLocaleDateString('en-us', { month: 'long' })} ${year}`;
 
-// Delete Node
-document.getElementById("deleteNode").addEventListener("click", function () {
-  const selectedNode = jm.get_selected_node();
-  if (!selectedNode) {
-    alert("Please select a node to delete.");
-    return;
+  calendar.innerHTML = '';
+
+  for(let i = 1; i <= paddingDays + daysInMonth; i++) {
+    const daySquare = document.createElement('div');
+    daySquare.classList.add('day');
+
+    const dayString = `${month + 1}/${i - paddingDays}/${year}`;
+
+    if (i > paddingDays) {
+      daySquare.innerText = i - paddingDays;
+      const eventForDay = events.find(e => e.date === dayString);
+
+      if (i - paddingDays === day && nav === 0) {
+        daySquare.id = 'currentDay';
+      }
+
+      if (eventForDay) {
+        const eventDiv = document.createElement('div');
+        eventDiv.classList.add('event');
+        eventDiv.innerText = eventForDay.title;
+        daySquare.appendChild(eventDiv);
+      }
+
+      daySquare.addEventListener('click', () => openModal(dayString));
+    } else {
+      daySquare.classList.add('padding');
+    }
+
+    calendar.appendChild(daySquare);    
   }
-  if (selectedNode.id === "root") {
-    alert("Cannot delete the root node.");
-    return;
-  }
+}
 
-  jm.remove_node(selectedNode.id); // Remove the selected node
-  jm.refresh(); // Refresh the mind map layout after deleting a node
-});
+function closeModal() {
+  eventTitleInput.classList.remove('error');
+  newEventModal.style.display = 'none';
+  deleteEventModal.style.display = 'none';
+  backDrop.style.display = 'none';
+  eventTitleInput.value = '';
+  clicked = null;
+  load();
+}
 
-// Edit Node
-document.getElementById("editNode").addEventListener("click", function () {
-  const selectedNode = jm.get_selected_node();
-  if (!selectedNode) {
-    alert("Please select a node to edit.");
-    return;
-  }
+function saveEvent() {
+  if (eventTitleInput.value) {
+    eventTitleInput.classList.remove('error');
 
-  const newTopic = prompt("Enter the new topic for this node:", selectedNode.topic);
-  if (newTopic) {
-    const updatedNode = {
-      id: selectedNode.id,
-      topic: newTopic
-    };
-    jm.update_node(updatedNode); // Update the node's topic
-    jm.refresh(); // Refresh the mind map layout after updating a node
+    events.push({
+      date: clicked,
+      title: eventTitleInput.value,
+    });
+
+    localStorage.setItem('events', JSON.stringify(events));
+    closeModal();
+  } else {
+    eventTitleInput.classList.add('error');
   }
-});
+}
+
+function deleteEvent() {
+  events = events.filter(e => e.date !== clicked);
+  localStorage.setItem('events', JSON.stringify(events));
+  closeModal();
+}
+
+function initButtons() {
+  document.getElementById('nextButton').addEventListener('click', () => {
+    nav++;
+    load();
+  });
+
+  document.getElementById('backButton').addEventListener('click', () => {
+    nav--;
+    load();
+  });
+
+  document.getElementById('saveButton').addEventListener('click', saveEvent);
+  document.getElementById('cancelButton').addEventListener('click', closeModal);
+  document.getElementById('deleteButton').addEventListener('click', deleteEvent);
+  document.getElementById('closeButton').addEventListener('click', closeModal);
+}
+
+initButtons();
+load();
