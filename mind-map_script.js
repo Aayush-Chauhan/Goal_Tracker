@@ -22,6 +22,7 @@ let mindMapData = {
         jm = new jsMind({
           container: 'mindMapCanvas',
           theme: 'primary',
+          editable: true
         });
         jm.show(mindMapData); // Initialize the mind map
       }
